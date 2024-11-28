@@ -21,31 +21,26 @@ def get_gsheet_service():
 
 
 def load_data_from_google_sheets(**kwargs):
-    sheet_id_1 = '1fq820VFHfqjMllet10Z7wXdoOrvHhOLi8d5ru8mJWG4'
-    sheet_id_2 = '1s03JjEbI5y1VdMNNHK5ratHV9urTkppiRMvJVVKFFiA'
-    sheets = ['spam_train', 'spam_test']
-
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH)
+    client = gspread.authorize(creds)
+    sheet_names = ['spam_train', 'spam_test']
     dfs = {}
-    service = get_gsheet_service()
 
-    for sheet in sheets:
-        if sheet == 'spam_train':
-            range_ = 'spam_train!A1:B3901'
-        elif sheet == 'spam_test':
-            range_ = 'spam_test!A1:B1673'
-
+    for sheet_name in sheet_names:
         try:
-            result = service.spreadsheets().values().get(
-                spreadsheetId=sheet_id_1 if sheet == 'spam_train' else sheet_id_2, range=range_).execute()
-            values = result.get('values', [])
-
-            if not values:
-                print(f"No data found in {sheet}.")
+            sheet = client.open(sheet_name).sheet1
+            data = sheet.get_all_values()
+            if data:
+                df = pd.DataFrame(data[1:], columns=data[0])
+                dfs[sheet_name] = df
+                print(f"Loaded data from '{sheet_name}', shape: {df.shape}.")
             else:
-                data = pd.DataFrame(values[1:], columns=values[0])
-                dfs[sheet] = data
-        except HttpError as err:
-            print(f"Error for data from {sheet}: {err}")
+                print(f"No data found in sheet '{sheet_name}'")
+        except gspread.exceptions.SpreadsheetNotFound:
+            print(f"Sheet '{sheet_name}' not found")
+        except Exception as e:
+            print(f"Error: '{sheet_name}': {e}")
 
     ti = kwargs['ti']
     ti.xcom_push(key='dfs', value=dfs)
@@ -59,8 +54,9 @@ def clean_data(**kwargs):
         data = data.dropna()
         data = data.drop_duplicates()
         dfs[sheet] = data
-
+    print('DFS :', dfs)
     ti.xcom_push(key='dfs', value=dfs)
+    print('DFS :', dfs)
 
 
 def feature_engineering(**kwargs):
@@ -68,23 +64,22 @@ def feature_engineering(**kwargs):
     dfs = ti.xcom_pull(task_ids='clean_data', key='dfs')
 
     for sheet, data in dfs.items():
-        data['message_length'] = data['message'].apply(len)
-        data['num_digits'] = data['message'].apply(lambda x: sum(c.isdigit() for c in x))
-        data['num_uppercase'] = data['message'].apply(lambda x: sum(c.isupper() for c in x))
-        data['num_special_chars'] = data['message'].apply(lambda x: sum(not c.isalnum() for c in x))
-        data['num_words'] = data['message'].apply(lambda x: len(x.split()))
-        data['avg_word_length'] = data['message'].apply(
+        data['message_length'] = data['v2'].apply(len)
+        data['num_digits'] = data['v2'].apply(lambda x: sum(c.isdigit() for c in x))
+        data['num_uppercase'] = data['v2'].apply(lambda x: sum(c.isupper() for c in x))
+        data['num_special_chars'] = data['v2'].apply(lambda x: sum(not c.isalnum() for c in x))
+        data['num_words'] = data['v2'].apply(lambda x: len(x.split()))
+        data['avg_word_length'] = data['v2'].apply(
             lambda x: np.mean([len(word) for word in x.split()]) if len(x.split()) > 0 else 0)
 
         dfs[sheet] = data
-
+    print('DFS :',dfs)
     ti.xcom_push(key='dfs', value=dfs)
 
 
 def scale_and_normalize(**kwargs):
     ti = kwargs['ti']
     dfs = ti.xcom_pull(task_ids='feature_engineering', key='dfs')
-
     for sheet, data in dfs.items():
         for col in data.select_dtypes(include=[np.number]).columns:
             mean = data[col].mean()
@@ -97,39 +92,35 @@ def scale_and_normalize(**kwargs):
             data[col] = (data[col] - min_val) / (max_val - min_val)
 
         dfs[sheet] = data
-
+        print('DFS :', dfs)
     ti.xcom_push(key='dfs', value=dfs)
 
 
 def save_to_google_sheets(**kwargs):
     ti = kwargs['ti']
     dfs = ti.xcom_pull(task_ids='feature_engineering', key='dfs')
-
+    sheet_ids = {
+        'spam_train': '1fq820VFHfqjMllet10Z7wXdoOrvHhOLi8d5ru8mJWG4',
+        'spam_test': '1s03JjEbI5y1VdMNNHK5ratHV9urTkppiRMvJVVKFFiA'
+    }
+    print('DFS :', dfs)
+    # aktualizacja danych dla kazdego arkusza
+    service = get_gsheet_service()
     for sheet, data in dfs.items():
-        print(f"Saving to Google Sheets: {sheet} with columns {data.columns.tolist()}")
+        sheet_id = sheet_ids[sheet]
+        values = [data.columns.tolist()] + data.values.tolist()
+        body = {
+            'values': values
+        }
 
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, scope)
-    client = gspread.authorize(creds)
-
-    train_sheet = client.open("spam_train").sheet1
-    test_sheet = client.open("spam_test").sheet1
-
-    for sheet_name, data in dfs.items():
-        print(f"Uploading {sheet_name} with {len(data)} rows and columns: {data.columns.tolist()}")
-
-        if sheet_name == 'spam_train':
-            sheet = train_sheet
-        elif sheet_name == 'spam_test':
-            sheet = test_sheet
-        else:
-            continue
-
-        values = data.values.tolist()
-        sheet.update([data.columns.values.tolist()] + values)
-        print(f"Data uploded to Google Sheets: {sheet_name}")
-
-    print("Data saved to Google Sheets.")
+        try:
+            range_ = 'A1'
+            service.spreadsheets().values().update(
+                spreadsheetId=sheet_id, range=range_, valueInputOption="RAW", body=body
+            ).execute()
+            print(f"Updated {sheet} with new data.")
+        except HttpError as err:
+            print(f"Error updating {sheet}: {err}")
 
 
 default_args = {
