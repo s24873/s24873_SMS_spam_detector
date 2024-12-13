@@ -1,0 +1,7 @@
+flask
+pandas
+joblib
+h2o
+apache-airflow
+apache-airflow-providers-google
+oauth2client
