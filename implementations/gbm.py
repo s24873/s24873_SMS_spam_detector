@@ -6,8 +6,8 @@ from sklearn.metrics import accuracy_score, mean_absolute_error
 
 h2o.init()
 
-train_path = 'train.csv'
-test_path = 'test.csv'
+train_path = '../ml_data/train.csv'
+test_path = '../ml_data/test.csv'
 train_df = pd.read_csv(train_path)
 test_df = pd.read_csv(test_path)
 train_h2o = h2o.H2OFrame(train_df)

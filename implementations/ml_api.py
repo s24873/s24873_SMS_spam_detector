@@ -5,7 +5,7 @@ import pandas as pd
 app = Flask(__name__)
 h2o.init()
 
-MODEL_PATH = "models/GBM_1_AutoML_3_20241128_24147"
+MODEL_PATH = "../models/GBM_1_AutoML_3_20241128_24147"
 model = h2o.load_model(MODEL_PATH)
 
 @app.route('/predict', methods=['POST'])

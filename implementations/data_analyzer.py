@@ -4,7 +4,7 @@ import seaborn as sns
 import sweetviz as sv
 
 # poki co odczytywanie z pliku z katalogu projektu ze wzgledu na bledy z dostepem po pobraniu datasetu przez kagglehub
-data_path = "spam.csv"
+data_path = "../ml_data/spam.csv"
 data = pd.read_csv(data_path, encoding="ISO-8859-1")
 
 print("\nPierwsze 5 wierszy:")

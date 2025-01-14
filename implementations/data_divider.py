@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-data = pd.read_csv("spam.csv", encoding="ISO-8859-1")
+data = pd.read_csv("../ml_data/spam.csv", encoding="ISO-8859-1")
 data = data[['v1', 'v2']].copy()
 data.columns = ['label', 'message']
 data['label'] = data['label'].map({'ham': 0, 'spam': 1})

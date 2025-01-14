@@ -4,8 +4,8 @@ import pandas as pd
 
 h2o.init()
 
-train_data = pd.read_csv("train.csv")
-test_data = pd.read_csv("test.csv")
+train_data = pd.read_csv("../ml_data/train.csv")
+test_data = pd.read_csv("../ml_data/test.csv")
 train_data_h2o = h2o.H2OFrame(train_data)
 test_data_h2o = h2o.H2OFrame(test_data)
 
