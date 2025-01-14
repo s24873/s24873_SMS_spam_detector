@@ -1,0 +1,19 @@
+{
+    "v2": "CONGRATS!!! You have won 2000$ in our prize draw! Call 111333444 to claim your reward :).",
+    "message_length": 85,
+    "num_digits": 9,
+    "num_uppercase": 8,
+    "num_special_chars": 5,
+    "num_words": 16,
+    "avg_word_length": 4.3
+}
+
+{
+    "v2": "Will you come to my party tonight?!",
+    "message_length": 36,
+    "num_digits": 0,
+    "num_uppercase": 1,
+    "num_special_chars": 2,
+    "num_words": 7,
+    "avg_word_length": 4.6
+}
